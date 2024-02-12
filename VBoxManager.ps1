@@ -87,55 +87,54 @@ switch ($action) {
 
     "clone" {
         if ($vmNameOrUUID -and $cloneNames.Count -gt 0) {
-            # Message de début groupé
             $cloneNamesJoined = $cloneNames -join ", "
-            Write-Host "Tentative de clonage de la VM '$vmNameOrUUID' vers : $cloneNamesJoined..."
+            Write-Host "`n==================== Tentative de Clonage ====================" -ForegroundColor Cyan
+            Write-Host "VM source: '$vmNameOrUUID' | Clones: $cloneNamesJoined`n" -ForegroundColor Yellow
             
             foreach ($cloneName in $cloneNames) {
+                Write-Host "`n===> Clonage vers: $cloneName" -ForegroundColor Cyan
                 $output = & $vboxManagePath clonevm $vmNameOrUUID --name $cloneName --register 2>&1
                 if ($output -like "*already exists*") {
-                    Write-Host "Erreur : Le clone '$cloneName' existe déjà." -ForegroundColor Red
+                    Write-Host "Erreur: Le clone '$cloneName' existe déjà." -ForegroundColor Red
                 } elseif ($output -like "*Could not find a registered machine named*") {
-                    Write-Host "Erreur : La machine virtuelle spécifiée '$vmNameOrUUID' n'existe pas." -ForegroundColor Red
-                    # Afficher la liste des VMs disponibles
-                    Write-Host "Voici la liste des machines virtuelles disponibles :"
-                    & $vboxManagePath list vms | ForEach-Object { Write-Host $_ }
-                    break # Sortir de la boucle pour éviter de répéter l'erreur pour chaque cloneName
+                    Write-Host "Erreur: La VM spécifiée '$vmNameOrUUID' n'existe pas." -ForegroundColor Red
+                    Write-Host "Liste des VMs disponibles :" -ForegroundColor Yellow
+                    & $vboxManagePath list vms | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+                    break
                 } elseif ($output -like "*error:*") {
-                    Write-Host "Erreur lors du clonage vers '$cloneName'. Détails : $output" -ForegroundColor Red
+                    Write-Host "Erreur lors du clonage: $output" -ForegroundColor Red
                 } else {
-                    Write-Host "Le clone '$cloneName' a été créé avec succès." -ForegroundColor Green
+                    Write-Host "Succès: Clone '$cloneName' créé." -ForegroundColor Green
                     # Application des paramètres de configuration au clone
                     if ($diskSizeMB -gt 0) {
-                        # Trouver le disque principal du clone et redimensionner
                         $diskUUID = Get-VMMainDiskUUID -vmNameOrUUID $cloneName
                         if ($diskUUID) {
                             & $vboxManagePath modifymedium disk $diskUUID --resize $diskSizeMB > $null 2>&1
-                            Write-Host "Disque du clone '$cloneName' redimensionné à $diskSizeMB MB." -ForegroundColor Green
+                            Write-Host "Disque redimensionné à $diskSizeMB MB." -ForegroundColor Green
                         }
                     }
                     if ($cpuCores -gt -1) {
-                        # Modification du nombre de CPU
                         & $vboxManagePath modifyvm $cloneName --cpus $cpuCores
-                        Write-Host "Nombre de CPU du clone '$cloneName' modifié à $cpuCores." -ForegroundColor Green
+                        Write-Host "Nombre de CPU modifié à $cpuCores." -ForegroundColor Green
                     }
                     if ($ramSize -gt -1) {
-                        # Modification de la RAM
                         & $vboxManagePath modifyvm $cloneName --memory $ramSize
-                        Write-Host "RAM du clone '$cloneName' modifiée à $ramSize MB." -ForegroundColor Green
+                        Write-Host "RAM modifiée à $ramSize MB." -ForegroundColor Green
                     }
     
-                    # Démarrer la VM après la configuration
+                    # Démarrer la VM
+                    Write-Host "Démarrage de la VM '$cloneName'..." -ForegroundColor Yellow
                     & $vboxManagePath startvm $cloneName --type headless
-                    Write-Host "Le clone '$cloneName' a été démarré automatiquement." -ForegroundColor Green
+                    Write-Host "VM '$cloneName' démarrée avec succès." -ForegroundColor Green
                 }
             }
             
-            Write-Host "Les tentatives de clonage pour '$vmNameOrUUID' sont terminées."
+            Write-Host "`n================== Clonage Terminé ==================" -ForegroundColor Cyan
         } else {
             Write-Host "Paramètres manquants ou incohérents pour l'action de clonage." -ForegroundColor Red
         }
     }
+    
     
     "resize" {
         if ($vmNameOrUUID) {
