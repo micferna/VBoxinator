@@ -33,7 +33,8 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
 
 ### Clone,Start,Stop,Reboot,Liste,Delete les VM (multiple)
 ```powershell
-.\VBoxManager.ps1 -action clone  -vmNameOrUUID "debian"       -cloneNames "NOM_DU_CLONE","NOM_DU_CLONE1"
+# Optionnel au clone : -diskSizeMB 50480 -cpuCores 4 -ramSize 4096
+.\VBoxManager.ps1 -action clone  -vmNameOrUUID "debian"       -cloneNames "NOM_DU_CLONE","NOM_DU_CLONE1" 
 .\VBoxManager.ps1 -action resize -vmNameOrUUID "NOM_DU_CLONE" -diskSizeMB 50480 -cpuCores 4 -ramSize 4096
 
 .\VBoxManager.ps1 -action start  -vmNameOrUUID "NOM_DU_CLONE","NOM_DU_CLONE1"
