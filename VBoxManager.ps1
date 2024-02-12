@@ -76,26 +76,6 @@ function Get-VMMainDiskUUID {
     return $diskUUID
 }
 
-function StopVM {
-    param (
-        [Parameter(Mandatory=$true)]
-        [string]$vmNameOrUUID
-    )
-
-    Write-Host "Arret de la machine virtuelle '$vmNameOrUUID'..." -ForegroundColor Cyan
-    & $vboxManagePath controlvm $vmNameOrUUID poweroff
-}
-
-function StartVM {
-    param (
-        [Parameter(Mandatory=$true)]
-        [string]$vmNameOrUUID
-    )
-
-    Write-Host "Demarrage de la machine virtuelle '$vmNameOrUUID'..." -ForegroundColor Cyan
-    & $vboxManagePath startvm $vmNameOrUUID --type headless
-}
-
 switch ($action) {
     "list" {
         ListVMsWithIP
@@ -104,13 +84,13 @@ switch ($action) {
     "showvminfo" {
         ShowVMInfo -vmNameOrUUID $vmNameOrUUID
     }
-    
+
     "clone" {
         if ($vmNameOrUUID -and $cloneNames.Count -gt 0) {
             # Message de début groupé
             $cloneNamesJoined = $cloneNames -join ", "
             Write-Host "Tentative de clonage de la VM '$vmNameOrUUID' vers : $cloneNamesJoined..."
-    
+            
             foreach ($cloneName in $cloneNames) {
                 $output = & $vboxManagePath clonevm $vmNameOrUUID --name $cloneName --register 2>&1
                 if ($output -like "*already exists*") {
@@ -125,15 +105,37 @@ switch ($action) {
                     Write-Host "Erreur lors du clonage vers '$cloneName'. Détails : $output" -ForegroundColor Red
                 } else {
                     Write-Host "Le clone '$cloneName' a été créé avec succès." -ForegroundColor Green
+                    # Application des paramètres de configuration au clone
+                    if ($diskSizeMB -gt 0) {
+                        # Trouver le disque principal du clone et redimensionner
+                        $diskUUID = Get-VMMainDiskUUID -vmNameOrUUID $cloneName
+                        if ($diskUUID) {
+                            & $vboxManagePath modifymedium disk $diskUUID --resize $diskSizeMB > $null 2>&1
+                            Write-Host "Disque du clone '$cloneName' redimensionné à $diskSizeMB MB." -ForegroundColor Green
+                        }
+                    }
+                    if ($cpuCores -gt -1) {
+                        # Modification du nombre de CPU
+                        & $vboxManagePath modifyvm $cloneName --cpus $cpuCores
+                        Write-Host "Nombre de CPU du clone '$cloneName' modifié à $cpuCores." -ForegroundColor Green
+                    }
+                    if ($ramSize -gt -1) {
+                        # Modification de la RAM
+                        & $vboxManagePath modifyvm $cloneName --memory $ramSize
+                        Write-Host "RAM du clone '$cloneName' modifiée à $ramSize MB." -ForegroundColor Green
+                    }
+    
+                    # Démarrer la VM après la configuration
+                    & $vboxManagePath startvm $cloneName --type headless
+                    Write-Host "Le clone '$cloneName' a été démarré automatiquement." -ForegroundColor Green
                 }
             }
-    
+            
             Write-Host "Les tentatives de clonage pour '$vmNameOrUUID' sont terminées."
         } else {
             Write-Host "Paramètres manquants ou incohérents pour l'action de clonage." -ForegroundColor Red
         }
     }
-    
     
     "resize" {
         if ($vmNameOrUUID) {
@@ -217,8 +219,6 @@ switch ($action) {
         Write-Host "Fin des tentatives de suppression des machines virtuelles."
     }
     
-    
-
     "start" {
         # Concaténer les noms pour le message de début
         $vmNamesJoined = $vmNameOrUUID -join ", "
@@ -318,7 +318,6 @@ switch ($action) {
             Write-Host "Les tentatives d'arrêt des machines virtuelles '$vmNamesJoined' sont terminées." -ForegroundColor Cyan
         }
     }
-    
     
     "reboot" {
         # Concaténer les noms pour le message de début
